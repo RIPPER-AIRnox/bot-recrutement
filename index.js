@@ -38,7 +38,7 @@ const client = new Client({
 // === READY ===
 client.once(Events.ClientReady, () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
-  client.user.setActivity("Recrutement Gendarmerie 👮‍♂️");
+  client.user.setActivity("Recrutement Gendarmerie, pour la Patrie l'Honneur et le Droit 👮‍♂️");
 });
 
 // === MESSAGE DE BIENVENUE ===
