@@ -25,7 +25,10 @@ const CATEGORY_GAV_ID = "1435687564617973893"; // DOSSIERS - EGAV
 const SOG_FORM_URL = "https://forms.gle/4nJLabtcr8V8ETJf9";
 const DEFAULT_IMAGE =
   "https://cdn.discordapp.com/attachments/1436398337405358080/1436655957928312862/Capture_decran_2025-11-08_131208.png?ex=691065a0&is=690f1420&hm=6b98c9c01a3a2e5cf03ff214074caab7bb7a481cbe3a7a9ad5b30b5ce017e0f0&";
-
+const CONTACT_CATEGORY_ID = "1435687564617973895";
+  // Remplace par l'ID du rôle qui doit voir les salons de contact :
+const GENDARMES_ROLE_ID = "ID_DU_ROLE_GENDARME";
+  
 // === CLIENT ===
 const client = new Client({
   intents: [
@@ -209,7 +212,90 @@ async function createEgavDossierFromModal(interaction, { nom, prenom, age, motiv
       // ➕ rôle recruteur ici si besoin
     ],
   });
-
+  async function createContactChannel(interaction, motifLabel) {
+    const guild = interaction.guild;
+  
+    // Vérifie si un salon existe déjà pour cet utilisateur
+    const existing = guild.channels.cache.find(
+      (ch) =>
+        ch.parentId === CONTACT_CATEGORY_ID &&
+        ch.type === ChannelType.GuildText &&
+        ch.topic === `contact-${interaction.user.id}`
+    );
+  
+    if (existing) {
+      await existing.send(
+        `🔁 ${interaction.user} a de nouveau sélectionné **${motifLabel}**. Merci de préciser votre demande ci-dessous.`
+      );
+  
+      return interaction.reply({
+        content: `📁 Vous avez déjà un salon de contact ouvert : ${existing}`,
+        ephemeral: true,
+      });
+    }
+  
+    // Nom du salon
+    const safeName = `contact-${interaction.user.username}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "");
+  
+    // Création du salon privé
+    const channel = await guild.channels.create({
+      name: safeName,
+      type: ChannelType.GuildText,
+      parent: CONTACT_CATEGORY_ID,
+      topic: `contact-${interaction.user.id}`,
+      permissionOverwrites: [
+        {
+          id: guild.roles.everyone,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: interaction.user.id,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.ReadMessageHistory,
+          ],
+        },
+        {
+          id: GENDARMES_ROLE_ID, // rôle gendarme / staff
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.ReadMessageHistory,
+          ],
+        },
+      ],
+    });
+  
+    // Message d’accueil dans le salon privé
+    const embed = {
+      color: 0x2b6cb0,
+      title: "🏛️ Centre de Contact Officiel - Gendarmerie Nationale",
+      description:
+        `${interaction.user}, vous avez ouvert un contact pour : **${motifLabel}**.\n\n` +
+        "Merci d’indiquer ci-dessous de manière claire et précise l’objet de votre demande.\n" +
+        "Un gendarme de la région **Île-de-France (77)** vous répondra dans les plus brefs délais.",
+      footer: {
+        text:
+          "Gendarmerie Nationale • Région Île-de-France (77) • " +
+          new Date().toLocaleString("fr-FR"),
+      },
+    };
+  
+    await channel.send({
+      content: `${interaction.user}`,
+      embeds: [embed],
+    });
+  
+    // Réponse éphémère à l’utilisateur
+    await interaction.reply({
+      content: `✅ Votre salon de contact a été créé : ${channel}`,
+      ephemeral: true,
+    });
+  }
+  
   const embed = {
     color: 0x2b6cb0,
     title: "École de Gendarmerie de Fontainebleau",
@@ -250,30 +336,35 @@ async function createEgavDossierFromModal(interaction, { nom, prenom, age, motiv
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    if (interaction.isStringSelectMenu() && interaction.customId === "contact_menu") {
+    if (
+      interaction.isStringSelectMenu() &&
+      interaction.customId === "contact_menu"
+    ) {
       const choice = interaction.values[0];
-      let response = "";
+      let motifLabel = "";
     
       switch (choice) {
         case "prise_contact":
-          response = "📞 Merci pour votre prise de contact. Un Gendarme vous répondra dès que possible.";
+          motifLabel = "Prise de contact";
           break;
         case "contact_compagnie":
-          response = "🏢 Pour contacter une compagnie ou brigade, veuillez préciser le secteur concerné.";
+          motifLabel = "Contact Compagnie";
           break;
         case "deposer_plainte":
-          response = "📋 Vous pouvez déposer une plainte en ligne via le lien officiel :\nhttps://www.pre-plainte-en-ligne.gouv.fr/";
+          motifLabel = "Déposer une plainte";
           break;
         case "contact_iggn":
-          response = "⚖️ Vous pouvez saisir l'Inspection Générale de la Gendarmerie ici :\nhttps://www.gendarmerie.interieur.gouv.fr/cegn/inspection-generale";
+          motifLabel = "Contact IGGN";
+          break;
+        default:
+          motifLabel = "Contact";
           break;
       }
     
-      await interaction.reply({
-        content: response,
-        ephemeral: true,
-      });
+      await createContactChannel(interaction, motifLabel);
+      return;
     }
+    
     
     // ----- SLASH COMMANDS -----
     if (interaction.isChatInputCommand()) {
