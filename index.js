@@ -250,6 +250,31 @@ async function createEgavDossierFromModal(interaction, { nom, prenom, age, motiv
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
+    if (interaction.isStringSelectMenu() && interaction.customId === "contact_menu") {
+      const choice = interaction.values[0];
+      let response = "";
+    
+      switch (choice) {
+        case "prise_contact":
+          response = "📞 Merci pour votre prise de contact. Un Gendarme vous répondra dès que possible.";
+          break;
+        case "contact_compagnie":
+          response = "🏢 Pour contacter une compagnie ou brigade, veuillez préciser le secteur concerné.";
+          break;
+        case "deposer_plainte":
+          response = "📋 Vous pouvez déposer une plainte en ligne via le lien officiel :\nhttps://www.pre-plainte-en-ligne.gouv.fr/";
+          break;
+        case "contact_iggn":
+          response = "⚖️ Vous pouvez saisir l'Inspection Générale de la Gendarmerie ici :\nhttps://www.gendarmerie.interieur.gouv.fr/cegn/inspection-generale";
+          break;
+      }
+    
+      await interaction.reply({
+        content: response,
+        ephemeral: true,
+      });
+    }
+    
     // ----- SLASH COMMANDS -----
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
