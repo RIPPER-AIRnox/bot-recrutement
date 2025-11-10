@@ -5,20 +5,42 @@ import {
     ActionRowBuilder,
   } from "discord.js";
   
+  // Salon où le message de contact doit toujours être envoyé
+  const CONTACT_CHANNEL_ID = "1435687564857315426";
+  
   export const data = new SlashCommandBuilder()
     .setName("contact")
-    .setDescription("Centre de Contact Officiel - Gendarmerie Nationale (77)");
+    .setDescription(
+      "Affiche le Centre de Contact Officiel de la Gendarmerie (Ile-de-France / 77)."
+    );
   
   export async function execute(interaction) {
+    // On récupère le salon cible
+    const targetChannel = interaction.client.channels.cache.get(
+      CONTACT_CHANNEL_ID
+    );
+  
+    if (!targetChannel) {
+      return interaction.reply({
+        content:
+          "❌ Impossible de trouver le salon de contact (ID: 1435687564857315426). Vérifie que le bot y a accès.",
+        ephemeral: true,
+      });
+    }
+  
     const embed = new EmbedBuilder()
       .setColor(0x2b6cb0)
       .setTitle("🏛️ Centre de Contact Officiel - Gendarmerie Nationale")
       .setDescription(
         "Bienvenue au **Centre de Contact Officiel** de la **Gendarmerie Nationale d'Île-de-France (Seine-et-Marne - 77)**.\n\n" +
-        "Pour prendre contact avec un Gendarme, veuillez sélectionner la raison ci-dessous."
+          "Pour prendre contact avec un Gendarme, veuillez sélectionner la raison ci-dessous."
       )
-      .setImage("https://media.discordapp.net/attachments/1292376806447386707/1436692456057081920/image_1.png?width=1421&height=800")
-      .setFooter({ text: "Gendarmerie Nationale • Région Île-de-France" });
+      .setImage(
+        "https://media.discordapp.net/attachments/1292376806447386707/1436692456057081920/image_1.png?width=1421&height=800"
+      )
+      .setFooter({
+        text: "Gendarmerie Nationale • Région Île-de-France (77)",
+      });
   
     const menu = new StringSelectMenuBuilder()
       .setCustomId("contact_menu")
@@ -52,9 +74,16 @@ import {
   
     const row = new ActionRowBuilder().addComponents(menu);
   
-    await interaction.reply({
+    // Envoi du message dans le salon dédié
+    await targetChannel.send({
       embeds: [embed],
       components: [row],
+    });
+  
+    // Confirmation éphémère pour l'utilisateur qui a exécuté la commande
+    await interaction.reply({
+      content: `✅ Centre de contact publié dans <#${CONTACT_CHANNEL_ID}>.`,
+      ephemeral: true,
     });
   }
   
