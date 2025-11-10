@@ -29,7 +29,7 @@ const DEFAULT_IMAGE =
 // Catégorie pour les salons de contact
 const CONTACT_CATEGORY_ID = "1435687564617973895";
 // Rôle qui doit voir tous les salons de contact (⚠️ à remplacer par le bon ID)
-const GENDARMES_ROLE_ID = "ID_DU_ROLE_GENDARME";
+const GENDARMES_ROLE_ID = "1435687563984900127";
 
 // === CLIENT ===
 const client = new Client({
@@ -168,95 +168,27 @@ async function createSogDossier(interaction) {
 }
 
 // ---------- EGAV : création du salon avec réponses du modal ----------
-async function createEgavDossierFromModal(
-  interaction,
-  { nom, prenom, age, motivation }
-) {
-  const guild = interaction.guild;
-
-  const existing = guild.channels.cache.find(
-    (ch) =>
-      ch.parentId === CATEGORY_GAV_ID &&
-      ch.type === ChannelType.GuildText &&
-      ch.topic === `dossier-EGAV-${interaction.user.id}`
-  );
-  if (existing) {
-    await existing.send(
-      `🔁 ${interaction.user} a soumis à nouveau ses informations.\n` +
-        `**Nom :** ${nom}\n**Prénom :** ${prenom}\n**Âge (IRL) :** ${age}\n**Motivation :** ${motivation}`
-    );
-    return interaction.reply({
-      content: `📁 Vous aviez déjà un salon EGAV, vos nouvelles informations ont été ajoutées ici : ${existing}`,
-      ephemeral: true,
-    });
-  }
-
-  const safeName = `dossier-egav-${interaction.user.username}`
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "");
-
-  const channel = await guild.channels.create({
-    name: safeName,
-    type: ChannelType.GuildText,
-    parent: CATEGORY_GAV_ID,
-    topic: `dossier-EGAV-${interaction.user.id}`,
-    permissionOverwrites: [
-      {
-        id: guild.roles.everyone,
-        deny: [PermissionsBitField.Flags.ViewChannel],
-      },
-      {
-        id: interaction.user.id,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-        ],
-      },
-      // ➕ rôle recruteur ici si besoin
-    ],
-  });
-
-  const embed = {
-    color: 0x2b6cb0,
-    title: "École de Gendarmerie de Fontainebleau",
-    description:
-      `${interaction.user}, vous avez ouvert une procédure pour intégrer le parcours **Gendarme Adjoint Volontaire (EGAV)**.\n\n` +
-      "📌 Voici les informations que vous avez fournies :",
-    fields: [
-      { name: "Nom", value: nom || "Non renseigné", inline: true },
-      { name: "Prénom", value: prenom || "Non renseigné", inline: true },
-      { name: "Âge (IRL)", value: age || "Non renseigné", inline: true },
-      {
-        name: "Motivation",
-        value: motivation || "Non renseignée",
-        inline: false,
-      },
-    ],
-    image: {
-      url: "https://cdn.discordapp.com/attachments/1436686300773224468/1436686461381378069/Capture_decran_2025-11-08_131208.png?ex=69108208&is=690f3088&hm=285bd048eabd1f88cffb9f1d864020ad91b8ea76ba7227994e0e3f7a6b1150f7&",
-    },
-    footer: {
-      text:
-        "CIR - Région d'Île-de-France • " +
-        new Date().toLocaleString("fr-FR"),
-    },
-  };
-
-  await channel.send({
-    content: `${interaction.user}`,
-    embeds: [embed],
-  });
-
-  await interaction.reply({
-    content: `📁 Votre dossier de candidature EGAV a été créé : ${channel}`,
-    ephemeral: true,
-  });
-}
-
-// ---------- CONTACT : création du salon privé ----------
 async function createContactChannel(interaction, motifLabel) {
   const guild = interaction.guild;
+
+  console.log(
+    `📨 Demande de contact: ${interaction.user.tag} (${interaction.user.id}) -> ${motifLabel}`
+  );
+
+  // Vérifier la catégorie
+  const parentCategory = guild.channels.cache.get(CONTACT_CATEGORY_ID);
+  if (!parentCategory || parentCategory.type !== ChannelType.GuildCategory) {
+    console.error(
+      "❌ Catégorie de contact introuvable ou invalide :",
+      CONTACT_CATEGORY_ID
+    );
+    await interaction.reply({
+      content:
+        "❌ La catégorie de contact est introuvable. Merci de contacter un administrateur.",
+      ephemeral: true,
+    });
+    return;
+  }
 
   // Vérifier si un salon existe déjà pour cet utilisateur
   const existing = guild.channels.cache.find(
@@ -271,43 +203,61 @@ async function createContactChannel(interaction, motifLabel) {
       `🔁 ${interaction.user} a de nouveau sélectionné **${motifLabel}**. Merci de préciser votre demande ci-dessous.`
     );
 
-    return interaction.reply({
+    await interaction.reply({
       content: `📁 Vous avez déjà un salon de contact ouvert : ${existing}`,
       ephemeral: true,
     });
+    return;
   }
 
+  // Nom propre du salon
   const safeName = `contact-${interaction.user.username}`
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "");
 
+  // Permissions de base : membre + personne
+  const permissionOverwrites = [
+    {
+      id: guild.roles.everyone.id,
+      deny: [PermissionsBitField.Flags.ViewChannel],
+    },
+    {
+      id: interaction.user.id,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+      ],
+    },
+  ];
+
+  // Si un rôle gendarme/staff valide est configuré et existe, on l'ajoute
+  if (
+    GENDARMES_ROLE_ID &&
+    /^\d{17,20}$/.test(GENDARMES_ROLE_ID) &&
+    guild.roles.cache.has(GENDARMES_ROLE_ID)
+  ) {
+    permissionOverwrites.push({
+      id: GENDARMES_ROLE_ID,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+      ],
+    });
+  } else {
+    console.log(
+      "ℹ️ Aucun rôle gendarme valide configuré pour les salons de contact. (GENDARMES_ROLE_ID ignoré)"
+    );
+  }
+
+  // Création du salon
   const channel = await guild.channels.create({
     name: safeName,
     type: ChannelType.GuildText,
     parent: CONTACT_CATEGORY_ID,
     topic: `contact-${interaction.user.id}`,
-    permissionOverwrites: [
-      {
-        id: guild.roles.everyone,
-        deny: [PermissionsBitField.Flags.ViewChannel],
-      },
-      {
-        id: interaction.user.id,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-        ],
-      },
-      {
-        id: GENDARMES_ROLE_ID, // rôle gendarme / staff
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-        ],
-      },
-    ],
+    permissionOverwrites,
   });
 
   const embed = {
@@ -334,6 +284,7 @@ async function createContactChannel(interaction, motifLabel) {
     ephemeral: true,
   });
 }
+
 
 // ===================== GESTION DES INTERACTIONS =====================
 
