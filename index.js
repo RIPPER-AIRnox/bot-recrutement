@@ -51,6 +51,17 @@ client.once(Events.ClientReady, () => {
 // === MESSAGE DE BIENVENUE ===
 client.on("guildMemberAdd", async (member) => {
   try {
+        // === Attribution automatique du rôle ===
+        const AUTO_ROLE_ID = "1435687563892621427"; // rôle à donner aux nouveaux
+        const role = member.guild.roles.cache.get(AUTO_ROLE_ID);
+    
+        if (role) {
+          await member.roles.add(role);
+          console.log(`✅ Rôle ${role.name} attribué à ${member.user.tag}`);
+        } else {
+          console.log("⚠️ Rôle automatique introuvable, vérifie l'ID :", AUTO_ROLE_ID);
+        }
+    
     const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
     if (!channel) return console.log("❌ Salon de bienvenue introuvable.");
 
